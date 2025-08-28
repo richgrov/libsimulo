@@ -1,8 +1,12 @@
 #include <emscripten.h>
 
+#include <memory>
+
+#include "simulo/simulo.h"
+
 extern "C" {
 
-static std::unique_ptr<Game> root_object;
+static std::unique_ptr<PoseHandler> root_object;
 
 static float simulo__pose_data[17 * 2] = {0};
 static float simulo__transform_data[16] = {0};

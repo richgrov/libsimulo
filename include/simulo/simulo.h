@@ -199,6 +199,11 @@ private:
   uint32_t simulo__render_id;
 };
 
+class PoseHandler : public Object {
+public:
+  virtual void on_pose(int id, Pose pose) {}
+};
+
 glm::ivec2 window_size() {
   return glm::ivec2(simulo_window_width(), simulo_window_height());
 }

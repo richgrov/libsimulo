@@ -13,7 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(main main.cc)
 
-target_include_directories(main PRIVATE glm)
+target_include_directories(main PUBLIC glm)
 target_include_directories(main PRIVATE include)
 
 target_link_options(main PRIVATE

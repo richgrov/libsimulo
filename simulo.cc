@@ -4,21 +4,27 @@
 
 #include "simulo/simulo.h"
 
-extern "C" {
+using namespace simulo;
 
 static std::unique_ptr<PoseHandler> root_object;
 
 static float simulo__pose_data[17 * 2] = {0};
 static float simulo__transform_data[16] = {0};
 
-EMSCRIPTEN_KEEPALIVE
-void simulo__start() {
-  kSolidTexture = std::numeric_limits<uint32_t>::max();
-  simulo_set_buffers(simulo__pose_data, simulo__transform_data);
+__attribute__((__import_name__("simulo_set_buffers"))) extern void
+simulo_set_buffers(float *pose, float *transform);
 
-  root_object = Game::create();
+__attribute__((__import_name__("simulo_set_root"))) extern void
+simulo_set_root(uint32_t id, void *self);
+
+void simulo::start(std::unique_ptr<PoseHandler> root) {
+  root_object = root;
+
+  simulo_set_buffers(simulo__pose_data, simulo__transform_data);
   simulo_set_root(root_object->simulo__id, root_object.get());
 }
+
+extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void simulo__update(void *ptr, float delta) {

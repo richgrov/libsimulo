@@ -10,12 +10,6 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-__attribute__((__import_name__("simulo_set_buffers"))) extern void
-simulo_set_buffers(float *pose, float *transform);
-
-__attribute__((__import_name__("simulo_set_root"))) extern void
-simulo_set_root(uint32_t id, void *self);
-
 __attribute__((__import_name__("simulo_create_object"))) extern uint32_t
 simulo_create_object();
 
@@ -72,6 +66,8 @@ simulo_delete_material(uint32_t id);
 
 extern "C" void simulo__pose(int id, bool alive);
 
+namespace simulo {
+
 class Pose {
 public:
   glm::vec2 nose() const { return glm::vec2(data_[0], data_[1]); }
@@ -118,6 +114,7 @@ private:
 
 class Material;
 class Object;
+class PoseHandler;
 
 class Material {
 public:
@@ -130,9 +127,7 @@ private:
   uint32_t simulo__id;
 };
 
-static uint32_t kSolidTexture;
-
-extern "C" void simulo__start();
+static uint32_t kSolidTexture = std::numeric_limits<uint32_t>::max();
 
 class Object {
 public:
@@ -174,7 +169,7 @@ public:
   glm::vec2 scale{1.0f, 1.0f};
 
 private:
-  friend void ::simulo__start();
+  friend void start(std::unique_ptr<PoseHandler> root);
   uint32_t simulo__id;
 };
 
@@ -209,3 +204,7 @@ glm::ivec2 window_size() {
 }
 
 float random_float() { return simulo_random(); }
+
+void start(std::unique_ptr<PoseHandler> root);
+
+} // namespace simulo

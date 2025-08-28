@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
-project(libsimulo LANGUAGES CXX)
+project(simulo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_library(libsimulo simulo.cc)
+add_library(simulo simulo.cc)
 
-target_include_directories(libsimulo PUBLIC glm)
-target_include_directories(libsimulo PUBLIC include)
+target_include_directories(simulo PUBLIC glm)
+target_include_directories(simulo PUBLIC include)

@@ -18,7 +18,6 @@ target_include_directories(main PRIVATE include)
 
 target_link_options(main PRIVATE
     "--no-entry"
-    "-sEXPORTED_FUNCTIONS=['_simulo__start','_simulo__update','_simulo__recalculate_transform','_simulo__pose','_simulo__drop']"
     "-sSTANDALONE_WASM=1"
 )
 

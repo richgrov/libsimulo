@@ -50,15 +50,6 @@ simulo_set_rendered_object_transform(uint32_t id, const float *transform);
 __attribute__((__import_name__("simulo_drop_rendered_object"))) extern void
 simulo_drop_rendered_object(uint32_t id);
 
-__attribute__((__import_name__("simulo_random"))) extern float
-simulo_random(void);
-
-__attribute__((__import_name__("simulo_window_width"))) extern int32_t
-simulo_window_width(void);
-
-__attribute__((__import_name__("simulo_window_height"))) extern int32_t
-simulo_window_height(void);
-
 __attribute__((__import_name__("simulo_create_material"))) extern uint32_t
 simulo_create_material(uint32_t image, float r, float g, float b);
 
@@ -200,11 +191,9 @@ public:
   virtual void on_pose(int id, std::optional<Pose> pose) {}
 };
 
-glm::ivec2 window_size() {
-  return glm::ivec2(simulo_window_width(), simulo_window_height());
-}
+glm::ivec2 window_size();
 
-float random_float() { return simulo_random(); }
+float random_float();
 
 void start(std::unique_ptr<PoseHandler> root);
 

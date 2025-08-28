@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <stdio.h>
 #include <vector>
 
@@ -196,7 +197,7 @@ private:
 
 class PoseHandler : public Object {
 public:
-  virtual void on_pose(int id, Pose pose) {}
+  virtual void on_pose(int id, std::optional<Pose> pose) {}
 };
 
 glm::ivec2 window_size() {

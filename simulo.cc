@@ -18,7 +18,7 @@ __attribute__((__import_name__("simulo_set_root"))) extern void
 simulo_set_root(uint32_t id, void *self);
 
 void simulo::start(std::unique_ptr<PoseHandler> root) {
-  root_object = root;
+  root_object = std::move(root);
 
   simulo_set_buffers(simulo__pose_data, simulo__transform_data);
   simulo_set_root(root_object->simulo__id, root_object.get());

@@ -51,7 +51,7 @@ __attribute__((__import_name__("simulo_drop_rendered_object"))) extern void
 simulo_drop_rendered_object(uint32_t id);
 
 __attribute__((__import_name__("simulo_create_material"))) extern uint32_t
-simulo_create_material(uint32_t image, float r, float g, float b);
+simulo_create_material(const char *asset_name, float r, float g, float b);
 
 __attribute__((__import_name__("simulo_delete_material"))) extern void
 simulo_delete_material(uint32_t id);
@@ -110,16 +110,14 @@ class PoseHandler;
 
 class Material {
 public:
-  Material(uint32_t image, float r, float g, float b)
-      : simulo__id(simulo_create_material(image, r, g, b)) {}
+  Material(const char *asset_name, float r, float g, float b)
+      : simulo__id(simulo_create_material(asset_name, r, g, b)) {}
 
 private:
   friend class Object;
   friend class RenderedObject;
   uint32_t simulo__id;
 };
-
-static uint32_t kSolidTexture = std::numeric_limits<uint32_t>::max();
 
 class Object {
 public:

@@ -48,14 +48,6 @@ void simulo__update(void *ptr, float delta) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void simulo__recalculate_transform(void *ptr) {
-  Object *object = static_cast<Object *>(ptr);
-  glm::mat4 transform = object->recalculate_transform();
-  std::memcpy(simulo__transform_data, glm::value_ptr(transform),
-              sizeof(simulo__transform_data));
-}
-
-EMSCRIPTEN_KEEPALIVE
 void simulo__pose(int id, bool alive) {
   root_object->on_pose(id, alive ? std::optional<Pose>(Pose(simulo__pose_data))
                                  : std::nullopt);

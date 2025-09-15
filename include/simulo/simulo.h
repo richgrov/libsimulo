@@ -26,9 +26,6 @@ simulo_num_children(uint32_t id);
 __attribute__((__import_name__("simulo_get_children"))) extern void
 simulo_get_children(uint32_t id, void *children);
 
-__attribute__((__import_name__("simulo_mark_transform_outdated"))) extern void
-simulo_mark_transform_outdated(uint32_t id);
-
 __attribute__((__import_name__("simulo_remove_object_from_parent"))) extern void
 simulo_remove_object_from_parent(uint32_t id);
 
@@ -128,7 +125,9 @@ private:
 
 class Object {
 public:
-  Object() : simulo__id(simulo_create_object()) {}
+  Object()
+      : simulo__id(simulo_create_object()),
+        parent_transform(glm::identity<glm::mat4>()) {}
 
   Object(const Object &) = delete;
   Object &operator=(const Object &) = delete;
@@ -139,15 +138,22 @@ public:
 
   virtual void update(float delta) {}
 
-  virtual glm::mat4 recalculate_transform() {
-    return glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f)) *
+  virtual glm::mat4 global_transform() {
+    return parent_transform *
+           glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f)) *
            glm::rotate(glm::mat4(1.0f), rotation, glm::vec3(0.0f, 0.0f, 1.0f)) *
            glm::scale(glm::mat4(1.0f), glm::vec3(scale, 1.0f));
   }
 
-  void transform_outdated() { simulo_mark_transform_outdated(simulo__id); }
+  virtual void recalculate_transform() {
+    glm::mat4 transform = global_transform();
+    for (Object *child : children()) {
+      child->parent_transform = transform;
+    }
+  }
 
   void add_child(std::unique_ptr<Object> object) {
+    object->parent_transform = global_transform();
     int id = object->simulo__id;
     simulo_set_object_ptrs(id, object.release());
     simulo_add_object_child(simulo__id, id);
@@ -164,6 +170,7 @@ public:
   glm::vec2 position;
   float rotation;
   glm::vec2 scale{1.0f, 1.0f};
+  glm::mat4 parent_transform;
 
 private:
   friend void start(std::unique_ptr<PoseHandler> root);
@@ -174,15 +181,12 @@ class RenderedObject : public Object {
 public:
   RenderedObject(const Material &material)
       : Object(),
-        simulo__render_id(simulo_create_rendered_object(material.simulo__id)) {
-    transform_outdated();
-  }
+        simulo__render_id(simulo_create_rendered_object(material.simulo__id)) {}
 
-  virtual glm::mat4 recalculate_transform() override {
-    glm::mat4 transform = Object::recalculate_transform();
+  virtual void recalculate_transform() override {
+    glm::mat4 transform = global_transform();
     simulo_set_rendered_object_transform(simulo__render_id,
                                          glm::value_ptr(transform));
-    return transform;
   }
 
   virtual ~RenderedObject() { simulo_drop_rendered_object(simulo__render_id); }

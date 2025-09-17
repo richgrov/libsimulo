@@ -145,10 +145,13 @@ public:
            glm::scale(glm::mat4(1.0f), glm::vec3(scale, 1.0f));
   }
 
-  virtual void recalculate_transform() {
+  virtual void recalculate_transform(bool update_children = false) {
     glm::mat4 transform = global_transform();
     for (Object *child : children()) {
       child->parent_transform = transform;
+      if (update_children) {
+        child->recalculate_transform(update_children);
+      }
     }
   }
 
@@ -183,7 +186,7 @@ public:
       : Object(),
         simulo__render_id(simulo_create_rendered_object(material.simulo__id)) {}
 
-  virtual void recalculate_transform() override {
+  virtual void recalculate_transform(bool update_children) override {
     glm::mat4 transform = global_transform();
     simulo_set_rendered_object_transform(simulo__render_id,
                                          glm::value_ptr(transform));

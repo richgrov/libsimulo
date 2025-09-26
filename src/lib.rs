@@ -8,8 +8,7 @@ use glam::{IVec2, Mat4, Vec2, Vec4};
 pub use pose::Pose;
 use shipyard::sparse_set::SparseSet;
 use shipyard::{
-    AllStoragesViewMut, Component, EntitiesView, EntitiesViewMut, EntityId, Get,
-    IntoIter, IntoWorkload, View, ViewMut, Workload, World,
+    AllStoragesViewMut, Component, EntitiesView, EntitiesViewMut, EntityId, Get, IntoIter, IntoWorkload, Unique, UniqueView, View, ViewMut, Workload, World
 };
 
 static mut POSE_DATA: pose::PoseData = [0.0; 17 * 2];
@@ -25,6 +24,9 @@ pub(crate) struct State {
     pub(crate) poses: HashMap<u32, EntityId>,
     pub(crate) game: Box<dyn Game>,
 }
+
+#[derive(Unique)]
+pub struct Delta(pub f32);
 
 pub struct Material(u32);
 
@@ -69,34 +71,57 @@ impl std::ops::Drop for Rendered {
     }
 }
 
-#[derive(Component)]
-#[track(All)]
-pub struct Trsk {
-    pub position: Vec2,
-    pub rotation: f32,
-    pub scale: Vec2,
-    pub skew: Vec2,
-}
+#[derive(Component, Clone, Default)]
+pub struct Position2d(pub Vec2);
 
-impl Default for Trsk {
-    fn default() -> Self {
-        Self {
-            position: Vec2::ZERO,
-            rotation: 0.0,
-            scale: Vec2::ONE,
-            skew: Vec2::ZERO,
-        }
+#[derive(Component, Clone, Default)]
+pub struct Rotation2d(pub f32);
+
+#[derive(Component, Clone, Default)]
+pub struct Scale2d(pub Vec2);
+
+#[derive(Component, Clone, Default)]
+pub struct Velocity2d(pub Vec2);
+
+#[derive(Component, Clone, Default)]
+#[track(Insertion, Modification)]
+pub struct Transform(pub Mat4);
+
+impl Transform {
+    pub fn from_2d_pos(position: Vec2) -> Self {
+        Self(Mat4::from_translation(position.extend(0.0)))
+    }
+
+    pub fn from_2d_pos_scale(position: Vec2, scale: Vec2) -> Self {
+        Self(Mat4::from_translation(position.extend(0.0)) * Mat4::from_scale(scale.extend(1.0)))
+    }
+
+    pub fn from_2d_pos_rotation(position: Vec2, rotation: f32) -> Self {
+        Self(Mat4::from_translation(position.extend(0.0)) * Mat4::from_rotation_z(rotation))
+    }
+
+    pub fn from_2d_pos_rotation_scale(position: Vec2, rotation: f32, scale: Vec2) -> Self {
+        Self(Mat4::from_translation(position.extend(0.0)) * Mat4::from_rotation_z(rotation) * Mat4::from_scale(scale.extend(1.0)))
+    }
+
+    pub fn from_2d_pos_rotation_scale_skew(position: Vec2, rotation: f32, scale: Vec2, skew: Vec2) -> Self {
+        Self(Mat4::from_translation(position.extend(0.0)) * Mat4::from_rotation_z(rotation) * Mat4::from_scale(scale.extend(1.0)) * Mat4::from_cols(
+            Vec4::new(1.0, skew.y, 0.0, 0.0),
+            Vec4::new(skew.x, 1.0, 0.0, 0.0),
+            Vec4::Z,
+            Vec4::W,
+        ))
     }
 }
 
 #[derive(Component, Clone)]
 #[track(All)]
-pub struct TransformState {
+pub struct GlobalTransform {
     pub parent: Mat4,
     pub global: Mat4,
 }
 
-impl Default for TransformState {
+impl Default for GlobalTransform {
     fn default() -> Self {
         Self {
             parent: Mat4::IDENTITY,
@@ -119,6 +144,13 @@ impl Hierarchy {
         }
     }
 
+    pub fn root_with_children<const N: usize>(children: [EntityId; N]) -> Self {
+        Self {
+            children: children.to_vec(),
+            level: 0,
+        }
+    }
+
     pub fn child_of<const N: usize>(parent: &Hierarchy, children: [EntityId; N]) -> Self {
         Self {
             children: children.to_vec(),
@@ -130,14 +162,24 @@ impl Hierarchy {
 #[derive(Component)]
 pub struct Delete;
 
+fn velocity_tick(
+    delta: UniqueView<Delta>,
+    mut positions: ViewMut<Position2d>,
+    velocities: View<Velocity2d>,
+) {
+    for (position, velocity) in (&mut positions, &velocities).iter() {
+        position.0 += velocity.0 * delta.0;
+    }
+}
+
 fn recalculate_transforms(
-    trsks: View<Trsk>,
+    transforms: View<Transform>,
     entites: EntitiesViewMut,
-    mut transform_states: ViewMut<TransformState>,
+    mut transform_states: ViewMut<GlobalTransform>,
     hierarchies: View<Hierarchy>,
 ) {
-    let mut updated_trsks = (
-        trsks.inserted_or_modified(),
+    let mut updated_transforms = (
+        transforms.inserted_or_modified(),
         &transform_states,
         &hierarchies,
     )
@@ -148,12 +190,12 @@ fn recalculate_transforms(
         })
         .collect::<Vec<_>>();
 
-    updated_trsks.sort_by_key(|&(_, _, level)| level);
+    updated_transforms.sort_by_key(|&(_, _, level)| level);
 
     let mut updated_entities = HashSet::new();
     let mut bfs = VecDeque::new();
     bfs.extend(
-        updated_trsks
+        updated_transforms
             .into_iter()
             .map(|(e, parent_transform, _)| (e, parent_transform)),
     );
@@ -163,24 +205,12 @@ fn recalculate_transforms(
             continue;
         }
 
-        let global_transform = {
-            let trsk = trsks.get(entity).unwrap();
-            parent_transform
-                * Mat4::from_translation(trsk.position.extend(0.0))
-                * Mat4::from_rotation_z(trsk.rotation)
-                * Mat4::from_scale(trsk.scale.extend(1.0))
-                * Mat4::from_cols(
-                    Vec4::new(1.0, trsk.skew.y, 0.0, 0.0),
-                    Vec4::new(trsk.skew.x, 1.0, 0.0, 0.0),
-                    Vec4::Z,
-                    Vec4::W,
-                )
-        };
+        let global_transform = parent_transform * transforms.get(entity).unwrap().0;
 
         entites.add_component(
             entity,
             &mut transform_states,
-            TransformState {
+            GlobalTransform {
                 parent: parent_transform,
                 global: global_transform,
             },
@@ -194,7 +224,7 @@ fn recalculate_transforms(
     }
 }
 
-fn update_global_transforms(transform_states: View<TransformState>, renders: View<Rendered>) {
+fn update_global_transforms(transform_states: View<GlobalTransform>, renders: View<Rendered>) {
     for (transform, rendered) in (transform_states.inserted_or_modified(), &renders).iter() {
         unsafe {
             simulo_set_rendered_object_transform(
@@ -239,6 +269,7 @@ fn do_delete(mut all: AllStoragesViewMut) {
 
 fn post_update_workload() -> Workload {
     (
+        velocity_tick,
         recalculate_transforms,
         update_global_transforms,
         propagate_delete_to_children,
@@ -273,6 +304,7 @@ unsafe extern "C" fn simulo__update(delta: f32) {
     let mut lock = STATE.lock().unwrap();
     let state = lock.as_mut().unwrap();
 
+    state.world.add_unique(Delta(delta));
     state.game.as_mut().update(&mut state.world, delta);
 
     state.world.run_workload(post_update_workload).unwrap();
@@ -314,7 +346,6 @@ unsafe extern "C" {
     fn simulo_set_rendered_object_transform(id: u32, matrix: *const f32);
     fn simulo_drop_rendered_object(id: u32);
 
-    fn simulo_random() -> f32;
     fn simulo_window_width() -> i32;
     fn simulo_window_height() -> i32;
 }
